@@ -26,6 +26,14 @@ math_server = StdioServerParams(
     args=["server.py"]
 )
 
+j_code = """
+public class HelloWorld {
+    public static void main(String[] args) {
+        System.out.println("Hello World!!");
+    }
+}
+"""
+
 async def main() -> None:
     math_tools = await mcp_server_tools(math_server)
     agent = AssistantAgent(
@@ -36,7 +44,7 @@ async def main() -> None:
         reflect_on_tool_use=True,
         model_client_stream=True, 
     )
-    await Console(agent.run_stream(task="what is 2 + 3=?"))
+    await Console(agent.run_stream(task=f"covert the java code {j_code} into python code"))
     await model_client.close()
 
 asyncio.run(main())

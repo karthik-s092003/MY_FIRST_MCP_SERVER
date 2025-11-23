@@ -4,10 +4,14 @@ import random
 import sys
 import requests
 from mcp.server.fastmcp import FastMCP
-# from autogen_agentchat.agents import AssistantAgent
-# from autogen_agentchat.ui import Console
-# from autogen_ext.models.openai import OpenAIChatCompletionClient
-# from autogen_core.models import ModelInfo
+from autogen_agentchat.agents import AssistantAgent
+from autogen_agentchat.ui import Console
+from autogen_ext.models.openai import OpenAIChatCompletionClient
+from autogen_core.models import ModelInfo
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 name = "demo-mcp-server"
 logging.basicConfig(
@@ -19,17 +23,17 @@ logger = logging.getLogger(name)
 
 mcp = FastMCP(name)
 
-# model_client = OpenAIChatCompletionClient(
-#     model="gemini-2.0-flash-lite",
-#     model_info=ModelInfo(
-#         vision=True,
-#         function_calling=True,
-#         json_output=True,
-#         family="unknown",
-#         structured_output=True
-#     ),
-#     api_key="AIzaSyCibA-csbHppyYBboqDysSzR8WDZaI2VKo",
-# )
+model_client = OpenAIChatCompletionClient(
+    model="gemini-2.0-flash-lite",
+    model_info=ModelInfo(
+        vision=True,
+        function_calling=True,
+        json_output=True,
+        family="unknown",
+        structured_output=True
+    ),
+    api_key=os.getenv("API_KEY"),
+)
 
 @mcp.tool()
 def add(a: int, b: int) -> int:
@@ -37,25 +41,52 @@ def add(a: int, b: int) -> int:
     logger.info(f"Tool called: add({a}, {b})")
     return a + b
 
-# @mcp.tool()
-# async def java_code(desc: str) -> str:
-#     """Writes Java code based on given description"""
-#     logger.info(f"Tool called: java_code({desc})")
-#     agent = AssistantAgent(
-#         name="AGENT",
-#         model_client=model_client,
-#         system_message="You are a java developer who returns only java code without any explanations.",
-#         reflect_on_tool_use=True,
-#         model_client_stream=True, 
-#     )
-#     task = f"Write Java code for: {desc}. Only return Java code, with no explanations."
-#     result = await agent.run(task=task)
-#     # Extract the message text:
-#     if hasattr(result, "messages") and len(result.messages) > 0:
-#         # Assume last message is the relevant code
-#         return result.messages[-1]
-#     # If not found, fallback:
-#     return str(result)
+@mcp.tool()
+async def java_code(desc: str) -> str: 
+    """Writes Java code based on given description"""
+    agent = AssistantAgent(
+        name="AGENT",
+        model_client=model_client,
+        system_message="You are a java developer who returns only java code without any explanations.",
+        reflect_on_tool_use=True,
+        model_client_stream=True, 
+    )
+    task = f"Write Java code for: {desc}. Only return Java code, with no explanations."
+    result = await agent.run(task=task)
+    
+    messages = result.get("messages", []) if isinstance(result, dict) else getattr(result, "messages", [])
+    if not messages:
+        return ""
+    last_content = messages[-1].content if hasattr(messages[-1], "content") else messages[-1].get("content", "")
+    
+    if last_content.startswith("``````"):
+        last_content = last_content[len("``````")]
+    
+    return last_content.strip()
+
+
+@mcp.tool()
+async def java_to_py_code_converter(javaCode: str) -> str: 
+    """converts java code to python code"""
+    agent = AssistantAgent(
+        name="AGENT",
+        model_client=model_client,
+        system_message="You are a code converter who takes java code and return python version of the given java code.",
+        reflect_on_tool_use=True,
+        model_client_stream=True, 
+    )
+    task = f"Convert the given java code: {javaCode} to Python code. Only return Python code, with no explanations."
+    result = await agent.run(task=task)
+    
+    messages = result.get("messages", []) if isinstance(result, dict) else getattr(result, "messages", [])
+    if not messages:
+        return ""
+    last_content = messages[-1].content if hasattr(messages[-1], "content") else messages[-1].get("content", "")
+    
+    if last_content.startswith("``````"):
+        last_content = last_content[len("``````")]
+    
+    return last_content.strip()
 
 
 @mcp.tool()
