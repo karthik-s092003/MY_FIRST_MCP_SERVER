@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import logging
 from typing import List
 from dotenv import load_dotenv
@@ -40,6 +41,10 @@ def create_folders(paths: List[str]) -> str:
     return "Folders created successfully"
 
 
+def strip_markdown_fences(text: str) -> str:
+    # Remove ```lang ... ``` or ``` ... ```
+    return re.sub(r"^```[\w+-]*\n|```$", "", text.strip(), flags=re.MULTILINE)
+
 @mcp.tool()
 async def generate_and_write_files(
     files: List[str],
@@ -50,8 +55,9 @@ async def generate_and_write_files(
         model_client=model_client,
         system_message=(
             "You are a senior developer.\n"
-            "Generate ONLY valid code for the given file.\n"
-            "No markdown. No explanation."
+            "Output ONLY raw source code.\n"
+            "DO NOT use markdown, backticks, or code fences.\n"
+            "Return plain text code only."
         ),
     )
 
@@ -64,7 +70,8 @@ Generate code for this file:
 {file}
 """
         result = await agent.run(task=task)
-        code = result.messages[-1].content.strip()
+        raw = result.messages[-1].content.strip()
+        code = strip_markdown_fences(raw)
 
         os.makedirs(os.path.dirname(file), exist_ok=True)
         with open(file, "w", encoding="utf-8") as f:
